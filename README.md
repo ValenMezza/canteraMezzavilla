@@ -161,4 +161,3 @@ Todas las tablas tienen **RLS** (Row Level Security) habilitado — solo usuario
 > Los módulos de Clientes, Cantera y Viajes tienen la estructura y conexión a DB lista.
 > La lógica de UI completa está en el artifact `sistema-aridos.jsx` y se puede migrar
 > componente por componente.
-# canteraMezzavilla
