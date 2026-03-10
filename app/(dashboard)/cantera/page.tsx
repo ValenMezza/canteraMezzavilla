@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import { useTable, type Producto, type Cliente, type VentaCantera, type Movimiento } from "@/lib/hooks";
-import { Modal, Fld, Stat, Empty, Ic, icons, fmt, fmtDate, fmtShort, inputCls, selectCls, btnPrimary, btnSecondary, btnSmall, downloadHTML } from "@/components/ui";
+import { Modal, Fld, Stat, Empty, Ic, icons, fmt, fmtDate, fmtShort, toISO, inputCls, selectCls, btnPrimary, btnSecondary, btnSmall, downloadHTML } from "@/components/ui";
 
 const PARTICULAR = { id: "PARTICULAR", nombre: "Particular", telefono: "-", email: "-", direccion: "-", cuenta_corriente: false, saldo: 0, created_at: "" };
 
@@ -24,6 +24,9 @@ export default function CanteraPage() {
   const [nota, setNota] = useState("");
   const [customPrice, setCustomPrice] = useState(false);
   const [precioFinal, setPrecioFinal] = useState("");
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printDesde, setPrintDesde] = useState("");
+  const [printHasta, setPrintHasta] = useState("");
 
   const cSel = clientes.find((c: any) => c.id === cliId);
   const fCli = clientes.filter((c: any) => c.nombre.toLowerCase().includes(qCli.toLowerCase()));
@@ -45,21 +48,39 @@ export default function CanteraPage() {
     setItems([{ productoId: "", cantidad: "" }]); setCliId("PARTICULAR"); setFp("efectivo"); setNota(""); setCustomPrice(false); setPrecioFinal("");
   };
 
-  const hoy = ventas.filter((v) => fmtShort(v.created_at) === fmtShort(new Date().toISOString()));
-
-  const printAll = () => {
-    const rows = ventas.map((v) => {
-      const prods = (v.items || []).map((i: any) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join(", ");
-      return `<tr><td>${fmtDate(v.created_at)}</td><td class="b">${v.cliente_nombre}</td><td>${prods}</td><td class="r a b">${fmt(Number(v.total))}</td></tr>`;
-    }).join("");
-    downloadHTML("Ventas Cantera", `<h2>Ventas en Cantera (${ventas.length})</h2><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Productos</th><th class="r">Total</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="3">TOTAL</td><td class="r a">${fmt(ventas.reduce((s, v) => s + Number(v.total), 0))}</td></tr></tbody></table>`);
+  const printVentaInd = (v: VentaCantera) => {
+    const items = (v.items || []).map((i: any) => `<tr><td>${i.nombre}</td><td class="r">${i.cantidad} ${i.unidad}</td><td class="r">${fmt(i.precio_unit)}</td><td class="r a b">${fmt(i.subtotal)}</td></tr>`).join("");
+    const fpLabel = v.forma_pago === "efectivo" ? "Efectivo" : v.forma_pago === "transferencia" ? "Transf." : "Cta.Cte.";
+    downloadHTML("Venta Cantera", `<h2>Comprobante de Venta — Cantera</h2>
+      <div class="detail"><strong>Cliente:</strong> ${v.cliente_nombre} &nbsp;|&nbsp; <strong>Fecha:</strong> ${fmtDate(v.created_at)} &nbsp;|&nbsp; <strong>Pago:</strong> ${fpLabel}${v.nota ? ` &nbsp;|&nbsp; <strong>Nota:</strong> ${v.nota}` : ""}</div>
+      <table><thead><tr><th>Producto</th><th class="r">Cantidad</th><th class="r">Precio</th><th class="r">Subtotal</th></tr></thead><tbody>${items}
+      <tr class="tot"><td colspan="3">TOTAL</td><td class="r a">${fmt(Number(v.total))}</td></tr></tbody></table>`);
   };
+
+  const printTotales = () => {
+    let fil = ventas;
+    let rangeLabel = "Histórico completo";
+    if (printDesde || printHasta) {
+      fil = ventas.filter((v) => { const d = toISO(v.created_at); return (!printDesde || d >= printDesde) && (!printHasta || d <= printHasta); });
+      rangeLabel = `${printDesde || "..."} al ${printHasta || "..."}`;
+    }
+    const rows = fil.map((v) => {
+      const prods = (v.items || []).map((i: any) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join(", ");
+      const fpLabel = v.forma_pago === "efectivo" ? "Efectivo" : v.forma_pago === "transferencia" ? "Transf." : "Cta.Cte.";
+      return `<tr><td>${fmtDate(v.created_at)}</td><td class="b">${v.cliente_nombre}</td><td>${prods}</td><td>${fpLabel}</td><td class="r a b">${fmt(Number(v.total))}</td></tr>`;
+    }).join("");
+    downloadHTML("Ventas Cantera", `<h2>Ventas en Cantera (${fil.length})</h2><p class="sub">${rangeLabel}</p>
+      <table><thead><tr><th>Fecha</th><th>Cliente</th><th>Productos</th><th>Pago</th><th class="r">Total</th></tr></thead><tbody>${rows}
+      <tr class="tot"><td colspan="4">TOTAL</td><td class="r a">${fmt(fil.reduce((s, v) => s + Number(v.total), 0))}</td></tr></tbody></table>`);
+  };
+
+  const hoy = ventas.filter((v) => fmtShort(v.created_at) === fmtShort(new Date().toISOString()));
 
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
         <h1 className="text-xl font-bold">Venta en Cantera</h1>
-        <button onClick={printAll} className={btnSecondary}><span className="flex items-center gap-1.5"><Ic d={icons.print} size={13} /> Imprimir</span></button>
+        <button onClick={() => { setPrintDesde(""); setPrintHasta(""); setShowPrintModal(true); }} className={btnSecondary}><span className="flex items-center gap-1.5"><Ic d={icons.print} size={13} /> Imprimir</span></button>
       </div>
 
       <div className="flex gap-3 mb-5 flex-wrap">
@@ -72,19 +93,15 @@ export default function CanteraPage() {
         {/* Form */}
         <div className="bg-surface border border-border rounded-xl p-5 flex-1 min-w-[340px]">
           <h3 className="font-semibold mb-4">Nueva Venta</h3>
-
           <Fld label="Cliente">
             <input value={qCli} onChange={(e) => setQCli(e.target.value)} placeholder="Buscar..." className={`${inputCls} mb-1.5`} />
-            <div className="max-h-24 overflow-auto border border-border rounded-md">
-              {fCli.map((c: any) => (
-                <button key={c.id} onClick={() => { setCliId(c.id); setQCli(""); if (c.id === "PARTICULAR" || !c.cuenta_corriente) setFp("efectivo"); }}
-                  className={`flex justify-between w-full px-3 py-1.5 text-xs text-left border-b border-border transition-colors ${cliId === c.id ? "bg-accent/10 text-accent" : "hover:bg-surface-alt"}`}>
-                  <span>{c.nombre}</span>{c.cuenta_corriente && <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded-full">CC</span>}
-                </button>
-              ))}
-            </div>
+            <div className="max-h-24 overflow-auto border border-border rounded-md">{fCli.map((c: any) => (
+              <button key={c.id} onClick={() => { setCliId(c.id); setQCli(""); if (c.id === "PARTICULAR" || !c.cuenta_corriente) setFp("efectivo"); }}
+                className={`flex justify-between w-full px-3 py-1.5 text-xs text-left border-b border-border transition-colors ${cliId === c.id ? "bg-accent/10 text-accent" : "hover:bg-surface-alt"}`}>
+                <span>{c.nombre}</span>{c.cuenta_corriente && <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded-full">CC</span>}
+              </button>
+            ))}</div>
           </Fld>
-
           <Fld label="Productos">
             {items.map((it, i) => {
               const p = productos.find((x) => x.id === it.productoId);
@@ -103,7 +120,6 @@ export default function CanteraPage() {
             })}
             <button onClick={() => setItems([...items, { productoId: "", cantidad: "" }])} className="w-full py-1.5 border border-dashed border-border rounded-md text-xs text-text-dim mt-1">+ Agregar</button>
           </Fld>
-
           <Fld label="Forma de Pago">
             <div className="flex gap-1.5">
               {[["efectivo", "Efectivo"], ["transferencia", "Transferencia"], ...(cSel?.cuenta_corriente && cliId !== "PARTICULAR" ? [["cuenta_corriente", "Cta.Cte."]] : [])].map(([v, l]) => (
@@ -111,9 +127,7 @@ export default function CanteraPage() {
               ))}
             </div>
           </Fld>
-
           <Fld label="Nota"><input value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls} placeholder="Patente, ref..." /></Fld>
-
           <div className="mb-3">
             <button onClick={() => { setCustomPrice(!customPrice); if (!customPrice) setPrecioFinal(String(calcTotal)); }}
               className={`flex items-center gap-2 px-4 py-2 rounded-md border text-xs font-semibold ${customPrice ? "bg-accent/10 border-accent/30 text-accent" : "bg-surface-alt border-border text-text-dim"}`}>
@@ -122,7 +136,6 @@ export default function CanteraPage() {
             </button>
           </div>
           {customPrice && <Fld label="Precio Final ($)"><input type="number" value={precioFinal} onChange={(e) => setPrecioFinal(e.target.value)} className={`${inputCls} !border-accent`} /></Fld>}
-
           <div className="bg-surface-alt rounded-lg px-4 py-3 flex justify-between items-center my-3">
             <div><span className="font-semibold text-sm">TOTAL</span>{customPrice && calcTotal !== total && <div className="text-[10px] text-text-dim">Calculado: {fmt(calcTotal)}</div>}</div>
             <span className="text-2xl font-bold text-accent">{fmt(total)}</span>
@@ -136,13 +149,32 @@ export default function CanteraPage() {
           {ventas.length === 0 ? <Empty icon={icons.cart} text="Sin ventas" /> :
             <div className="max-h-[430px] overflow-auto">{ventas.slice(0, 15).map((v) => (
               <div key={v.id} className="py-2 border-b border-border">
-                <div className="flex justify-between mb-0.5"><span className="font-semibold text-xs">{v.cliente_nombre}</span><span className="font-bold text-accent text-xs">{fmt(Number(v.total))}</span></div>
+                <div className="flex justify-between mb-0.5">
+                  <span className="font-semibold text-xs">{v.cliente_nombre}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-accent text-xs">{fmt(Number(v.total))}</span>
+                    <button onClick={() => printVentaInd(v)} className="text-text-dim hover:text-text-main"><Ic d={icons.print} size={10} /></button>
+                  </div>
+                </div>
                 <div className="text-[10px] text-text-dim">{(v.items || []).map((i: any) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join(" · ")}</div>
                 <div className="text-[10px] text-text-muted">{fmtDate(v.created_at)}</div>
               </div>
             ))}</div>}
         </div>
       </div>
+
+      {/* Print Modal */}
+      <Modal open={showPrintModal} onClose={() => setShowPrintModal(false)} title="Imprimir Ventas Cantera">
+        <div className="grid grid-cols-2 gap-3">
+          <Fld label="Desde (opcional)"><input type="date" value={printDesde} onChange={(e) => setPrintDesde(e.target.value)} className={inputCls} /></Fld>
+          <Fld label="Hasta (opcional)"><input type="date" value={printHasta} onChange={(e) => setPrintHasta(e.target.value)} className={inputCls} /></Fld>
+        </div>
+        <p className="text-xs text-text-dim mb-3">Dejá vacío para histórico completo.</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={() => setShowPrintModal(false)} className={btnSecondary}>Cerrar</button>
+          <button onClick={printTotales} className={btnPrimary}>Descargar</button>
+        </div>
+      </Modal>
     </div>
   );
 }

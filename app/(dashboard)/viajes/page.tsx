@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
 import { useTable, type Producto, type Cliente, type Viaje, type Movimiento } from "@/lib/hooks";
-import { Modal, ConfirmModal, Fld, Stat, Empty, Ic, icons, fmt, fmtDate, fmtDateOnly, inputCls, selectCls, btnPrimary, btnSecondary, btnSmall, downloadHTML } from "@/components/ui";
+import { Modal, ConfirmModal, Fld, Stat, Empty, Ic, icons, fmt, fmtDate, fmtDateOnly, toISO, inputCls, selectCls, btnPrimary, btnSecondary, btnSmall, downloadHTML } from "@/components/ui";
 
 const PARTICULAR = { id: "PARTICULAR", nombre: "Particular", telefono: "-", direccion: "-", cuenta_corriente: false, saldo: 0 };
 
@@ -20,6 +20,9 @@ export default function ViajesPage() {
   const [editV, setEditV] = useState<Viaje | null>(null);
   const [filtro, setFiltro] = useState("pendiente");
   const [confirm, setConfirm] = useState<{ type: string; viaje: Viaje } | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printDesde, setPrintDesde] = useState("");
+  const [printHasta, setPrintHasta] = useState("");
 
   const pend = viajes.filter((v) => v.estado === "pendiente");
   const fin = viajes.filter((v) => v.estado === "finalizado");
@@ -45,12 +48,31 @@ export default function ViajesPage() {
 
   const doCancelar = async (v: Viaje) => { await updateViaje(v.id, { estado: "cancelado" }); };
 
-  const printAll = () => {
-    const rows = viajes.map((v) => {
+  const printViajeInd = (v: Viaje) => {
+    const est = v.estado === "finalizado" ? "Finalizado" : v.estado === "cancelado" ? "Cancelado" : "Pendiente";
+    const fpLabel = v.forma_pago === "efectivo" ? "Efectivo" : v.forma_pago === "transferencia" ? "Transf." : "Cta.Cte.";
+    downloadHTML("Viaje", `<h2>Comprobante de Viaje</h2>
+      <div class="detail"><strong>Cliente:</strong> ${v.cliente_nombre} &nbsp;|&nbsp; <strong>Tel:</strong> ${v.telefono_contacto}<br/>
+      <strong>Dirección:</strong> ${v.direccion_entrega} &nbsp;|&nbsp; <strong>Entrega:</strong> ${fmtDateOnly(v.fecha_entrega)} ${v.hora_entrega}<br/>
+      <strong>Estado:</strong> ${est} &nbsp;|&nbsp; <strong>Pago:</strong> ${fpLabel}</div>
+      <table><thead><tr><th>Producto</th><th class="r">Cantidad</th><th class="r">Producto</th><th class="r">Flete</th><th class="r">Total</th></tr></thead><tbody>
+      <tr><td>${v.producto_nombre || "-"}</td><td class="r">${v.cantidad_producto || "-"} ${v.unidad_producto || ""}</td><td class="r">${fmt(Number(v.precio_producto || 0) * Number(v.cantidad_producto || 0))}</td><td class="r">${fmt(Number(v.precio_flete))}</td><td class="r a b">${fmt(Number(v.total))}</td></tr></tbody></table>`);
+  };
+
+  const printTotales = () => {
+    let fil = viajes;
+    let rangeLabel = "Histórico completo";
+    if (printDesde || printHasta) {
+      fil = viajes.filter((v) => { const d = toISO(v.created_at); return (!printDesde || d >= printDesde) && (!printHasta || d <= printHasta); });
+      rangeLabel = `${printDesde || "..."} al ${printHasta || "..."}`;
+    }
+    const rows = fil.map((v) => {
       const est = v.estado === "finalizado" ? '<span class="badge bg-g">Fin</span>' : v.estado === "cancelado" ? '<span class="badge bg-r">Canc</span>' : '<span class="badge bg-y">Pend</span>';
       return `<tr><td>${fmtDate(v.created_at)}</td><td class="b">${v.cliente_nombre}</td><td>${v.producto_nombre || "-"}</td><td>${v.direccion_entrega}</td><td>${est}</td><td class="r">${fmt(Number(v.precio_flete))}</td><td class="r a b">${fmt(Number(v.total))}</td></tr>`;
     }).join("");
-    downloadHTML("Ventas Viajes", `<h2>Viajes (${viajes.length})</h2><table><thead><tr><th>Creado</th><th>Cliente</th><th>Producto</th><th>Dirección</th><th>Estado</th><th class="r">Flete</th><th class="r">Total</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="6">TOTAL</td><td class="r a">${fmt(viajes.reduce((s, v) => s + Number(v.total), 0))}</td></tr></tbody></table>`);
+    downloadHTML("Ventas Viajes", `<h2>Viajes (${fil.length})</h2><p class="sub">${rangeLabel}</p>
+      <table><thead><tr><th>Creado</th><th>Cliente</th><th>Producto</th><th>Dirección</th><th>Estado</th><th class="r">Flete</th><th class="r">Total</th></tr></thead><tbody>${rows}
+      <tr class="tot"><td colspan="6">TOTAL</td><td class="r a">${fmt(fil.reduce((s, v) => s + Number(v.total), 0))}</td></tr></tbody></table>`);
   };
 
   return (
@@ -58,7 +80,7 @@ export default function ViajesPage() {
       <div className="flex justify-between items-center mb-5">
         <h1 className="text-xl font-bold">Venta de Viajes</h1>
         <div className="flex gap-2">
-          <button onClick={printAll} className={btnSecondary}><span className="flex items-center gap-1.5"><Ic d={icons.print} size={13} /> Imprimir</span></button>
+          <button onClick={() => { setPrintDesde(""); setPrintHasta(""); setShowPrintModal(true); }} className={btnSecondary}><span className="flex items-center gap-1.5"><Ic d={icons.print} size={13} /> Imprimir</span></button>
           <button onClick={() => { setEditV(null); setShowForm(true); }} className={btnPrimary}><span className="flex items-center gap-1.5"><Ic d={icons.plus} size={13} className="text-bg" /> Nuevo Viaje</span></button>
         </div>
       </div>
@@ -113,6 +135,7 @@ export default function ViajesPage() {
                     <button onClick={() => setConfirm({ type: "finalizar", viaje: v })} className={`${btnSmall} bg-green-500/10 text-green-400`}><span className="flex items-center gap-1"><Ic d={icons.check} size={10} className="text-green-400" /> Finalizar</span></button>
                     <button onClick={() => setConfirm({ type: "cancelar", viaje: v })} className={`${btnSmall} bg-red-500/10 text-red-400`}><span className="flex items-center gap-1"><Ic d={icons.x} size={10} className="text-red-400" /> Cancelar</span></button>
                   </>}
+                  <button onClick={() => printViajeInd(v)} className={`${btnSmall} bg-surface-alt text-text-dim`}><Ic d={icons.print} size={10} /></button>
                 </div>
               </div>
             );
@@ -124,10 +147,24 @@ export default function ViajesPage() {
         onNo={() => setConfirm(null)} />
 
       <ViajeFormModal open={showForm} onClose={() => { setShowForm(false); setEditV(null); }} editV={editV} productos={productos} clientes={clientes}
-      onSave={async (data: any) => {          if (editV) await updateViaje(editV.id, data);
+        onSave={async (data: any) => {
+          if (editV) await updateViaje(editV.id, data);
           else await insertViaje({ ...data, estado: "pendiente" } as any);
           setShowForm(false); setEditV(null);
         }} />
+
+      {/* Print Modal */}
+      <Modal open={showPrintModal} onClose={() => setShowPrintModal(false)} title="Imprimir Ventas Viajes">
+        <div className="grid grid-cols-2 gap-3">
+          <Fld label="Desde (opcional)"><input type="date" value={printDesde} onChange={(e) => setPrintDesde(e.target.value)} className={inputCls} /></Fld>
+          <Fld label="Hasta (opcional)"><input type="date" value={printHasta} onChange={(e) => setPrintHasta(e.target.value)} className={inputCls} /></Fld>
+        </div>
+        <p className="text-xs text-text-dim mb-3">Dejá vacío para histórico completo.</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={() => setShowPrintModal(false)} className={btnSecondary}>Cerrar</button>
+          <button onClick={printTotales} className={btnPrimary}>Descargar</button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -157,14 +194,12 @@ function ViajeFormModal({ open, onClose, editV, productos, clientes, onSave }: a
     <Modal open={open} onClose={onClose} title={editV ? "Editar Viaje" : "Nuevo Viaje"} width="max-w-xl">
       <Fld label="Cliente">
         <input value={qC} onChange={(e: any) => sQC(e.target.value)} placeholder="Buscar..." className={`${inputCls} mb-1.5`} />
-        <div className="max-h-20 overflow-auto border border-border rounded-md">
-          {fC.map((c: any) => (
-            <button key={c.id} onClick={() => { s("cliente_id", c.id); s("cliente_nombre", c.nombre); if (c.telefono && c.telefono !== "-") s("telefono_contacto", c.telefono); if (c.direccion && c.direccion !== "-") s("direccion_entrega", c.direccion); sQC(""); }}
-              className={`flex justify-between w-full px-3 py-1.5 text-xs text-left border-b border-border ${f.cliente_id === c.id ? "bg-accent/10 text-accent" : "hover:bg-surface-alt"}`}>
-              <span>{c.nombre}</span>
-            </button>
-          ))}
-        </div>
+        <div className="max-h-20 overflow-auto border border-border rounded-md">{fC.map((c: any) => (
+          <button key={c.id} onClick={() => { s("cliente_id", c.id); s("cliente_nombre", c.nombre); if (c.telefono && c.telefono !== "-") s("telefono_contacto", c.telefono); if (c.direccion && c.direccion !== "-") s("direccion_entrega", c.direccion); sQC(""); }}
+            className={`flex justify-between w-full px-3 py-1.5 text-xs text-left border-b border-border ${f.cliente_id === c.id ? "bg-accent/10 text-accent" : "hover:bg-surface-alt"}`}>
+            <span>{c.nombre}</span>
+          </button>
+        ))}</div>
       </Fld>
       <div className="grid grid-cols-2 gap-3">
         <Fld label="Teléfono *"><input value={f.telefono_contacto} onChange={(e: any) => s("telefono_contacto", e.target.value)} className={inputCls} placeholder="Obligatorio" /></Fld>
@@ -192,7 +227,6 @@ function ViajeFormModal({ open, onClose, editV, productos, clientes, onSave }: a
         </div>
       </Fld>
       <Fld label="Nota"><input value={f.nota} onChange={(e: any) => s("nota", e.target.value)} className={inputCls} /></Fld>
-
       <div className="mb-3">
         <button onClick={() => { setCustomPrice(!customPrice); if (!customPrice) setPrecioFinal(String(calcTotal)); }}
           className={`flex items-center gap-2 px-4 py-2 rounded-md border text-xs font-semibold ${customPrice ? "bg-accent/10 border-accent/30 text-accent" : "bg-surface-alt border-border text-text-dim"}`}>
@@ -201,7 +235,6 @@ function ViajeFormModal({ open, onClose, editV, productos, clientes, onSave }: a
         </button>
       </div>
       {customPrice && <Fld label="Precio Final ($)"><input type="number" value={precioFinal} onChange={(e: any) => setPrecioFinal(e.target.value)} className={`${inputCls} !border-accent`} /></Fld>}
-
       <div className="bg-surface-alt rounded-lg px-4 py-3 flex justify-between items-center my-3">
         <div><span className="font-semibold text-sm">TOTAL</span>{customPrice && <div className="text-[10px] text-text-dim">Calculado: {fmt(calcTotal)}</div>}</div>
         <span className="text-2xl font-bold text-accent">{fmt(total)}</span>
