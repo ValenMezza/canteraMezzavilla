@@ -124,8 +124,7 @@ export default function ViajesPage() {
         onNo={() => setConfirm(null)} />
 
       <ViajeFormModal open={showForm} onClose={() => { setShowForm(false); setEditV(null); }} editV={editV} productos={productos} clientes={clientes}
-        onSave={async (data) => {
-          if (editV) await updateViaje(editV.id, data);
+      onSave={async (data: any) => {          if (editV) await updateViaje(editV.id, data);
           else await insertViaje({ ...data, estado: "pendiente" } as any);
           setShowForm(false); setEditV(null);
         }} />
