@@ -143,9 +143,16 @@ export default function ClientesPage() {
           const n = ventas.filter((v) => v.cliente_id === c.id).length + viajes.filter((v) => v.cliente_id === c.id).length;
           return (
             <div key={c.id} className="bg-surface border border-border rounded-xl p-4 cursor-pointer hover:border-accent/30 transition-colors" onClick={() => { setDetCli(c); setDetTab("cantera"); }}>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-start">
                 <div><div className="font-semibold text-sm mb-0.5">{c.nombre}</div><div className="text-xs text-text-dim">{c.telefono || "-"}</div></div>
-                <button onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="text-text-dim hover:text-text-main"><Ic d={icons.edit} size={12} /></button>
+                <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => openEdit(c)} className="px-2.5 py-1.5 bg-surface-alt text-text-dim rounded text-xs font-semibold hover:text-accent transition-colors flex items-center gap-1">
+                    <Ic d={icons.edit} size={11} /> Editar
+                  </button>
+                  <button onClick={() => { if (Number(c.saldo) < 0) return; remove(c.id); }} className={`px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 ${Number(c.saldo) < 0 ? "bg-surface-alt text-text-muted cursor-not-allowed" : "bg-red-500/10 text-red-400 hover:bg-red-500/20"}`}>
+                    <Ic d={icons.trash} size={11} />
+                  </button>
+                </div>
               </div>
               <div className="flex gap-1.5 mt-3 flex-wrap">
                 {c.cuenta_corriente && <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${Number(c.saldo) < 0 ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>{fmt(Number(c.saldo))}</span>}
