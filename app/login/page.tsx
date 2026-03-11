@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -19,13 +19,16 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
+    // If user typed an email, use it directly. Otherwise append @mezzavilla.local
+    const email = username.includes("@") ? username : `${username.toLowerCase().trim()}@mezzavilla.local`;
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      setError("Email o contraseña incorrectos");
+      setError("Usuario o contraseña incorrectos");
       setLoading(false);
       return;
     }
@@ -52,7 +55,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-surface border border-border rounded-xl p-7">
+        <div className="bg-surface border border-border rounded-xl p-6 sm:p-7">
           <h2 className="text-base font-semibold text-text-main mb-5">
             Iniciar Sesión
           </h2>
@@ -60,16 +63,21 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <div className="mb-4">
               <label className="block text-[11px] font-semibold text-text-dim uppercase tracking-wider mb-1.5">
-                Email
+                Usuario
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-bg border border-border rounded-md px-3.5 py-2.5 text-sm text-text-main outline-none focus:border-accent transition-colors"
-                placeholder="tu@email.com"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-bg border border-border rounded-md px-3.5 py-3 text-sm text-text-main outline-none focus:border-accent transition-colors"
+                placeholder="Tu nombre de usuario"
+                autoCapitalize="none"
+                autoCorrect="off"
                 required
               />
+              <p className="text-[10px] text-text-muted mt-1.5">
+                Podés usar tu usuario o email
+              </p>
             </div>
 
             <div className="mb-5">
@@ -80,7 +88,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-bg border border-border rounded-md px-3.5 py-2.5 text-sm text-text-main outline-none focus:border-accent transition-colors"
+                className="w-full bg-bg border border-border rounded-md px-3.5 py-3 text-sm text-text-main outline-none focus:border-accent transition-colors"
                 placeholder="••••••••"
                 required
               />
@@ -95,7 +103,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-accent text-bg font-semibold rounded-md py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-accent text-bg font-semibold rounded-md py-3 text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
             >
               {loading ? "Ingresando..." : "Ingresar"}
             </button>

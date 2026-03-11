@@ -6,27 +6,53 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   font-family: "DM Sans", sans-serif;
   background: #0c0e14;
   color: #e8e6e1;
+  overscroll-behavior: none;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+/* Safe area for iPhone notch/home indicator */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-::-webkit-scrollbar-track {
-  background: #151821;
+
+/* Better touch targets on mobile */
+@media (max-width: 768px) {
+  button, select, input {
+    min-height: 44px;
+  }
+  table {
+    font-size: 11px;
+  }
+  th, td {
+    padding: 6px 8px !important;
+  }
 }
-::-webkit-scrollbar-thumb {
-  background: #282d42;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3a3f5c;
+
+/* Custom scrollbar (desktop only) */
+@media (min-width: 769px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #151821;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #282d42;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3f5c;
+  }
 }
 
 /* Print styles */
